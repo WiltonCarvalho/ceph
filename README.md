@@ -66,4 +66,5 @@ aws configure set region us-east-1 --profile default
 aws s3 mb s3://test --endpoint-url http://ceph
 aws s3 cp /etc/hosts s3://test --endpoint-url http://ceph
 aws s3 ls --endpoint-url http://ceph
+aws s3 ls s3://test --endpoint-url http://ceph
 ```
