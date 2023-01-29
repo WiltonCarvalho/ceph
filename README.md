@@ -76,3 +76,8 @@ aws s3 cp /etc/hosts s3://test --endpoint-url http://ceph
 aws s3 ls --endpoint-url http://ceph
 aws s3 ls s3://test --endpoint-url http://ceph
 ```
+```
+apt install libvirt-daemon-system libvirt-clients libvirt-daemon-driver-storage-rbd \
+  ovmf qemu-kvm qemu-utils virtinst --no-install-recommends
+usermod -aG libvirt,kvm ubuntu
+```
