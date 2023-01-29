@@ -78,6 +78,15 @@ aws s3 ls s3://test --endpoint-url http://ceph
 ```
 ```
 apt install libvirt-daemon-system libvirt-clients libvirt-daemon-driver-storage-rbd \
-  ovmf qemu-kvm qemu-utils virtinst --no-install-recommends
+  ovmf qemu-kvm qemu-utils qemu-block-extra virtinst --no-install-recommends
 usermod -aG libvirt,kvm ubuntu
+
+curl -fsSL https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64-disk-kvm.img \
+  -o /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img
+qemu-img convert -p -f qcow2 -O rbd /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img \
+  rbd:rbd/ubuntu-template
+
+rbd snap create rbd/ubuntu-template@1
+rbd snap protect rbd/ubuntu-template@1
+rbd clone rbd/ubuntu-template@1 rbd/test1
 ```
