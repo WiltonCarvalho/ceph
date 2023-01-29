@@ -1,7 +1,10 @@
 # ceph single node
 ```
 multipass launch -n ceph -v -c 4 -m 4G -d 20G --cloud-init multipass.yaml 22.04
-- Add two disks to the VM to be used as OSD
+sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd0.qcow2 10G
+sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd1.qcow2 10G
+virsh attach-disk ceph /var/lib/libvirt/images/ceph-osd0.qcow2 vdc --persistent --subdriver qcow2 --live
+virsh attach-disk ceph /var/lib/libvirt/images/ceph-osd1.qcow2 vdd --persistent --subdriver qcow2 --live
 
 multipass shell ceph
 ```
@@ -32,11 +35,16 @@ exit
 apt install ceph-common
 
 ceph -s
-
+```
+```
 ceph orch apply osd --all-available-devices
+
+# OR
+
 ceph orch daemon add osd ceph:/dev/vdc
 ceph orch daemon add osd ceph:/dev/vdd
-
+```
+```
 ceph osd pool create rbd
 ceph osd pool application enable rbd rbd
 rbd create disk1 --size 1G
