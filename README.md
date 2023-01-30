@@ -45,10 +45,14 @@ ceph orch daemon add osd ceph:/dev/vdc
 ceph orch daemon add osd ceph:/dev/vdd
 ```
 ```
-ceph osd pool create rbd
-ceph osd pool application enable rbd rbd
-rbd create disk1 --size 1G
-rbd ls -l
+ceph tell mon.* injectargs --mon_allow_pool_delete true
+ceph osd pool delete libvirt-pool libvirt-pool --yes-i-really-really-mean-it
+
+ceph osd pool create libvirt-pool
+ceph osd pool application enable libvirt-pool rbd
+rbd pool init libvirt-pool
+rbd -p libvirt-pool create disk1 --size 1G
+rbd -p libvirt-pool ls -l
 
 radosgw-admin realm create --rgw-realm=default --default
 radosgw-admin zonegroup create --rgw-zonegroup=default --master --default
@@ -78,15 +82,100 @@ aws s3 ls s3://test --endpoint-url http://ceph
 ```
 ```
 apt install libvirt-daemon-system libvirt-clients libvirt-daemon-driver-storage-rbd \
-  ovmf qemu-kvm qemu-utils qemu-block-extra virtinst --no-install-recommends
+  ovmf qemu-kvm qemu-utils qemu-block-extra virtinst cloud-image-utils whois --no-install-recommends
 usermod -aG libvirt,kvm ubuntu
 
 curl -fsSL https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64-disk-kvm.img \
   -o /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img
-qemu-img convert -p -f qcow2 -O rbd /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img \
-  rbd:rbd/ubuntu-template
 
-rbd snap create rbd/ubuntu-template@1
-rbd snap protect rbd/ubuntu-template@1
-rbd clone rbd/ubuntu-template@1 rbd/test1
+ceph auth del client.libvirt
+ceph auth get-or-create client.libvirt mon "profile rbd" osd "profile rbd pool=libvirt-pool"
+ceph auth get client.libvirt > /etc/ceph/ceph.client.libvirt.keyring
+
+qemu-img convert -p -f qcow2 -O rbd /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img \
+  rbd:libvirt-pool/ubuntu-template:id=libvirt
+
+rbd snap create libvirt-pool/ubuntu-template@1
+rbd snap protect libvirt-pool/ubuntu-template@1
+rbd clone libvirt-pool/ubuntu-template@1 libvirt-pool/test1
+qemu-img resize -f rbd "rbd:libvirt-pool/test1" 5G
+
+ssh-keygen -C "Ubuntu Cloud User" -f ./ubuntu -q -N ""
+
+touch my-meta-data
+cat <<EOF> my-user-data
+#cloud-config
+password: $(printf "passw0rd" | mkpasswd -s --method=SHA-512)
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+  - $(cat ubuntu.pub)
+EOF
+cloud-localds -d raw -f iso /var/lib/libvirt/images/cidata.img my-user-data my-meta-data
+
+qemu-img convert -p -f raw -O rbd /var/lib/libvirt/images/cidata.img rbd:libvirt-pool/cidata
+rbd snap create libvirt-pool/cidata@1
+rbd snap protect libvirt-pool/cidata@1
+```
+```
+SECRET_UUID=$(uuidgen)
+CEPH_USER_KEY=$(ceph auth get-key client.libvirt)
+
+cat <<EOF> secret.xml
+<secret ephemeral='no' private='no'>
+  <uuid>$SECRET_UUID</uuid>
+  <usage type='ceph'>
+    <name>client.libvirt secret</name>
+  </usage>
+</secret>
+EOF
+virsh secret-list
+virsh secret-undefine
+virsh secret-define --file secret.xml
+
+virsh secret-set-value --secret $SECRET_UUID --base64 $CEPH_USER_KEY
+virsh secret-get-value --secret $SECRET_UUID
+
+cat <<EOF> pool.xml
+<pool type="rbd">
+  <name>ceph</name>
+  <source>
+    <name>libvirt-pool</name>
+    <host name='ceph' port='6789'/>
+    <auth username='libvirt' type='ceph'>
+      <secret uuid='${SECRET_UUID}'/>
+    </auth>
+  </source>
+</pool>
+EOF
+
+virsh pool-undefine ceph
+virsh pool-define pool.xml
+virsh pool-start ceph
+virsh pool-autostart ceph
+```
+```
+virsh pool-refresh ceph
+
+virt-install --connect qemu:///system \
+--name test1 \
+--vcpus=2 \
+--ram 1024 \
+--os-variant=ubuntu22.04 \
+--disk vol=ceph/test1,device=disk,bus=scsi,cache=writeback,discard=unmap,format=raw,serial=$(uuidgen) \
+--disk vol=ceph/cidata,device=cdrom,bus=scsi,cache=writeback,discard=unmap,format=raw,readonly=on,shareable=on \
+--network network=default,model=virtio \
+--import \
+--controller type=scsi,model=virtio-scsi \
+--virt-type kvm \
+--hvm \
+--accelerate \
+--cpu host-passthrough \
+--noreboot \
+--noautoconsole \
+--channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
+--console pty,target_type=serial \
+--graphics spice,listen=127.0.0.1 \
+--serial pty \
+--boot uefi
 ```
