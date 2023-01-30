@@ -1,10 +1,10 @@
 # ceph single node
 ```
 multipass launch -n ceph-node1 -v -c 4 -m 4G -d 20G --cloud-init multipass.yaml 22.04
-sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd0.qcow2 10G
-sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd1.qcow2 10G
-virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-osd0.qcow2 vdc --persistent --subdriver qcow2 --live
-virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-osd1.qcow2 vdd --persistent --subdriver qcow2 --live
+sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-node1-osd0.qcow2 10G
+sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-node1-osd1.qcow2 10G
+virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-node1-osd0.qcow2 vdc --persistent --subdriver qcow2 --live
+virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-node1-osd1.qcow2 vdd --persistent --subdriver qcow2 --live
 
 multipass shell ceph-node1
 ```
