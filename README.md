@@ -41,8 +41,8 @@ ceph orch apply osd --all-available-devices
 
 # OR
 
-ceph orch daemon add osd ceph:/dev/vdc
-ceph orch daemon add osd ceph:/dev/vdd
+ceph orch daemon add osd ceph-node1:/dev/vdc
+ceph orch daemon add osd ceph-node1:/dev/vdd
 ```
 ```
 ceph tell mon.* injectargs --mon_allow_pool_delete true
