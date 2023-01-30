@@ -1,0 +1,60 @@
+```
+sudo wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64-disk-kvm.img \
+  -O /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img
+
+sudo cp /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img /var/lib/libvirt/images/node1.qcow2
+
+sudo qemu-img resize -f qcow2 /var/lib/libvirt/images/node1.qcow2 16G
+
+
+ssh-keygen -C "Ubuntu Cloud User" -f ./ubuntu -q -N ""
+
+cat <<EOF> my-user-data
+#cloud-config
+password: $(printf "passw0rd" | mkpasswd -s --method=SHA-512)
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+  - $(cat ubuntu.pub)
+EOF
+
+cat <<EOF> my-network-config
+version: 2
+ethernets:
+  enp1s0:
+    dhcp4: false
+bridges:
+  br0:
+    dhcp4: true
+    interfaces: [ enp1s0 ]
+    parameters:
+      stp: false
+      forward-delay: 0
+EOF
+
+sudo cloud-localds -d raw -f iso /var/lib/libvirt/images/node1-cidata.iso my-user-data --network-config my-network-config --hostname node1
+
+virt-install --connect qemu:///system \
+--import \
+--name node1 \
+--vcpus=2 \
+--ram 1024 \
+--os-variant=ubuntu22.04 \
+--disk /var/lib/libvirt/images/node1.qcow2,device=disk,bus=scsi,cache=writeback,discard=unmap,format=qcow2,serial=$(uuidgen) \
+--disk /var/lib/libvirt/images/node1-cidata.iso,device=cdrom,bus=scsi,cache=writeback,discard=unmap,format=raw,readonly=on,shareable=on \
+--network bridge:virbr0,model=virtio \
+--controller type=scsi,model=virtio-scsi \
+--virt-type kvm \
+--hvm \
+--accelerate \
+--cpu host-passthrough \
+--channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
+--console pty,target_type=serial \
+--graphics spice,listen=127.0.0.1 \
+--serial pty \
+--boot uefi \
+--noautoconsole \
+--noreboot
+
+virsh net-dhcp-leases default
+```
