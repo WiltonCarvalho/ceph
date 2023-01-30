@@ -1,12 +1,12 @@
 # ceph single node
 ```
-multipass launch -n ceph -v -c 4 -m 4G -d 20G --cloud-init multipass.yaml 22.04
+multipass launch -n ceph-node1 -v -c 4 -m 4G -d 20G --cloud-init multipass.yaml 22.04
 sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd0.qcow2 10G
 sudo qemu-img create -f qcow2 /var/lib/libvirt/images/ceph-osd1.qcow2 10G
-virsh attach-disk ceph /var/lib/libvirt/images/ceph-osd0.qcow2 vdc --persistent --subdriver qcow2 --live
-virsh attach-disk ceph /var/lib/libvirt/images/ceph-osd1.qcow2 vdd --persistent --subdriver qcow2 --live
+virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-osd0.qcow2 vdc --persistent --subdriver qcow2 --live
+virsh attach-disk ceph-node1 /var/lib/libvirt/images/ceph-osd1.qcow2 vdd --persistent --subdriver qcow2 --live
 
-multipass shell ceph
+multipass shell ceph-node1
 ```
 ```
 apt update
@@ -59,7 +59,7 @@ radosgw-admin zonegroup create --rgw-zonegroup=default --master --default
 radosgw-admin zone create --rgw-zonegroup=default --rgw-zone=us-east-1 --master --default
 
 ceph orch host ls
-ceph orch apply rgw default us-east-1 --placement="1 ceph"
+ceph orch apply rgw default us-east-1 --placement="1 ceph-node1"
 ceph -s
 
 apt install curl unzip
@@ -75,10 +75,10 @@ aws configure set aws_access_key_id test --profile default
 aws configure set aws_secret_access_key test --profile default
 aws configure set region us-east-1 --profile default
 
-aws s3 mb s3://test --endpoint-url http://ceph
-aws s3 cp /etc/hosts s3://test --endpoint-url http://ceph
-aws s3 ls --endpoint-url http://ceph
-aws s3 ls s3://test --endpoint-url http://ceph
+aws s3 mb s3://test --endpoint-url http://ceph-node1
+aws s3 cp /etc/hosts s3://test --endpoint-url http://ceph-node1
+aws s3 ls --endpoint-url http://ceph-node1
+aws s3 ls s3://test --endpoint-url http://ceph-node1
 ```
 ```
 apt install libvirt-daemon-system libvirt-clients libvirt-daemon-driver-storage-rbd \
@@ -141,7 +141,7 @@ cat <<EOF> pool.xml
   <name>ceph</name>
   <source>
     <name>libvirt-pool</name>
-    <host name='ceph' port='6789'/>
+    <host name='ceph-node1' port='6789'/>
     <auth username='libvirt' type='ceph'>
       <secret uuid='${SECRET_UUID}'/>
     </auth>
@@ -158,6 +158,7 @@ virsh pool-autostart ceph
 virsh pool-refresh ceph
 
 virt-install --connect qemu:///system \
+--import \
 --name test1 \
 --vcpus=2 \
 --ram 1024 \
@@ -165,17 +166,16 @@ virt-install --connect qemu:///system \
 --disk vol=ceph/test1,device=disk,bus=scsi,cache=writeback,discard=unmap,format=raw,serial=$(uuidgen) \
 --disk vol=ceph/cidata,device=cdrom,bus=scsi,cache=writeback,discard=unmap,format=raw,readonly=on,shareable=on \
 --network network=default,model=virtio \
---import \
 --controller type=scsi,model=virtio-scsi \
 --virt-type kvm \
 --hvm \
 --accelerate \
 --cpu host-passthrough \
---noreboot \
---noautoconsole \
 --channel unix,target_type=virtio,name=org.qemu.guest_agent.0 \
 --console pty,target_type=serial \
 --graphics spice,listen=127.0.0.1 \
 --serial pty \
---boot uefi
+--boot uefi \
+--noautoconsole \
+--noreboot
 ```
