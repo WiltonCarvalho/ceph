@@ -114,8 +114,6 @@ EOF
 cloud-localds -d raw -f iso /var/lib/libvirt/images/cidata.img my-user-data my-meta-data
 
 qemu-img convert -p -f raw -O rbd /var/lib/libvirt/images/cidata.img rbd:libvirt-pool/cidata
-rbd snap create libvirt-pool/cidata@1
-rbd snap protect libvirt-pool/cidata@1
 ```
 ```
 SECRET_UUID=$(uuidgen)
