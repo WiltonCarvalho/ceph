@@ -5,6 +5,7 @@ sudo wget https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-am
 sudo cp /var/lib/libvirt/images/jammy-server-cloudimg-amd64-disk-kvm.img /var/lib/libvirt/images/node1.qcow2
 
 sudo qemu-img resize -f qcow2 /var/lib/libvirt/images/node1.qcow2 16G
+sudo qemu-img create -f qcow2 /var/lib/libvirt/images/node1-osd.qcow2 10G
 
 
 ssh-keygen -C "Ubuntu Cloud User" -f ./ubuntu -q -N ""
@@ -41,6 +42,7 @@ virt-install --connect qemu:///system \
 --ram 1024 \
 --os-variant=ubuntu22.04 \
 --disk /var/lib/libvirt/images/node1.qcow2,device=disk,bus=scsi,cache=writeback,discard=unmap,format=qcow2,serial=$(uuidgen) \
+--disk /var/lib/libvirt/images/node1-osd.qcow2,device=disk,bus=scsi,cache=writeback,discard=unmap,format=qcow2,serial=$(uuidgen) \
 --disk /var/lib/libvirt/images/node1-cidata.iso,device=cdrom,bus=scsi,cache=writeback,discard=unmap,format=raw,readonly=on,shareable=on \
 --network bridge:virbr0,model=virtio \
 --controller type=scsi,model=virtio-scsi \
