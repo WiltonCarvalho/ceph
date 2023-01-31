@@ -21,6 +21,8 @@ cephadm bootstrap \
 --allow-fqdn-hostname \
 --single-host-defaults
 
+# --skip-monitoring-stack
+
 cat <<'EOF'> grafana.yml
 service_type: grafana
 spec:
